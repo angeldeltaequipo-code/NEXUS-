@@ -1,0 +1,21 @@
+# NEXUS-LPR — Nodo edge, una instancia por cámara (instalación sin Docker)
+# Configuración en /opt/nexus-lpr/edge/camaras/<nombre>.env
+# Activar:  sudo systemctl enable --now nexus-edge@camara-01
+[Unit]
+Description=NEXUS-LPR cámara %i
+After=network-online.target nexus-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nexus
+WorkingDirectory=/opt/nexus-lpr/edge
+ExecStart=/opt/nexus-lpr/edge/venv/bin/python edge_daemon.py --env /opt/nexus-lpr/edge/camaras/%i.env
+Environment=QUEUE_FILE=/opt/nexus-lpr/data/cola-%i.jsonl
+Environment=OPENCV_FFMPEG_CAPTURE_OPTIONS=rtsp_transport;tcp
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

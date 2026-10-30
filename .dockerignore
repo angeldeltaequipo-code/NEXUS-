@@ -1,0 +1,9 @@
+node_modules
+data
+.env
+edge
+docs
+test
+deploy
+.git
+*.log

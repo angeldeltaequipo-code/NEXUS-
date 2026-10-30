@@ -1,0 +1,5 @@
+# NEXUS-LPR — Nodo edge (OCR de patentes)
+opencv-python-headless>=4.9
+rapidocr_onnxruntime>=1.2
+# Alternativa más pesada (PyTorch): descomente y use OCR_ENGINE=easyocr
+# easyocr>=1.7

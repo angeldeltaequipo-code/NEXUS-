@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .tab { @apply px-4 py-2.5 text-sm font-medium text-muted border-b-2 border-transparent whitespace-nowrap hover:text-primary; }
+  .tab-activa { @apply text-primary border-accent; }
+  .card { @apply bg-white rounded-xl border border-slate-200; }
+  .card-head { @apply px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-3; }
+  .kpi { @apply bg-white rounded-xl border border-slate-200 p-5; }
+  .kpi-label { @apply block text-xs font-medium text-muted uppercase tracking-wide mb-1; }
+  .kpi-valor { @apply text-3xl font-bold tabular-nums; }
+  .thead { @apply text-left text-xs text-muted uppercase tracking-wide border-b border-slate-200; }
+  .th { @apply px-5 py-3 font-medium whitespace-nowrap; }
+  .td { @apply px-5 py-3; }
+  .input { @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent; }
+  .btn-primario { @apply rounded-lg bg-primary text-white text-sm font-medium px-4 py-2 hover:bg-slate-800 transition; }
+  .btn-secundario { @apply rounded-lg border border-slate-300 bg-white text-sm font-medium px-3 py-2 hover:bg-slate-50 transition; }
+  .btn-mini { @apply rounded border border-slate-300 bg-white text-xs font-medium px-2 py-1 hover:bg-slate-50; }
+  .badge { @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap; }
+  .badge-ok { @apply badge bg-emerald-50 border-emerald-200 text-emerald-700; }
+  .badge-alerta { @apply badge bg-red-50 border-red-200 text-red-700; }
+  .badge-precaucion { @apply badge bg-amber-50 border-amber-200 text-amber-700; }
+  .badge-gris { @apply badge bg-slate-100 border-slate-200 text-muted; }
+  .chip-cam { @apply rounded bg-slate-100 border border-slate-200 px-1.5 py-0.5 text-[10px] font-mono text-muted whitespace-nowrap; }
+}

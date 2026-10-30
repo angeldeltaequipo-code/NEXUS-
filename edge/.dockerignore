@@ -1,0 +1,6 @@
+.env
+camaras
+cola_pendiente.jsonl
+__pycache__
+test_edge.py
+*.example

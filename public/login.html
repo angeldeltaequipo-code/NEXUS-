@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>NEXUS-LPR · Ingreso</title>
+<link rel="stylesheet" href="/tailwind.css">
+</head>
+<body class="min-h-screen bg-slate-50 text-primary antialiased flex items-center justify-center p-4">
+  <main class="w-full max-w-sm">
+    <div class="flex items-center gap-3 mb-8 justify-center">
+      <div class="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
+        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight">NEXUS-LPR</h1>
+        <p class="text-xs text-muted">Centro de Comando</p>
+      </div>
+    </div>
+    <form id="form" class="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
+      <div>
+        <label for="usuario" class="block text-xs font-medium text-muted uppercase tracking-wide mb-1">Usuario</label>
+        <input id="usuario" autocomplete="username" required autofocus
+          class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent">
+      </div>
+      <div>
+        <label for="password" class="block text-xs font-medium text-muted uppercase tracking-wide mb-1">Contraseña</label>
+        <input id="password" type="password" autocomplete="current-password" required
+          class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent">
+      </div>
+      <p id="error" class="hidden text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></p>
+      <button class="w-full rounded-lg bg-primary text-white text-sm font-medium py-2.5 hover:bg-slate-800 transition">Ingresar</button>
+    </form>
+    <p class="text-center text-xs text-muted mt-6">Acceso restringido · Toda actividad queda registrada (Ley 21.719)</p>
+  </main>
+  <script src="/login.js"></script>
+</body>
+</html>

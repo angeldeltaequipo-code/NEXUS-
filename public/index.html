@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>NEXUS-LPR · Centro de Comando</title>
+<link rel="stylesheet" href="/tailwind.css">
+</head>
+<body class="bg-slate-50 text-primary antialiased min-h-screen">
+
+  <!-- Banner de alerta -->
+  <div id="banner" class="hidden sticky top-0 z-50 bg-red-600 text-white">
+    <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+      <p class="text-sm font-semibold"><span class="mr-2">●</span><span id="banner-texto"></span></p>
+      <button id="banner-cerrar" class="text-xs font-medium border border-white/50 rounded px-2 py-1 hover:bg-white/10">Entendido</button>
+    </div>
+  </div>
+
+  <header class="bg-white border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
+          <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight whitespace-nowrap">NEXUS-LPR</h1>
+          <p class="text-xs text-muted hidden sm:block">Centro de Comando · Linares, Región del Maule</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 sm:gap-3">
+        <span id="reloj" class="text-sm font-mono text-muted hidden md:inline"></span>
+        <span id="estado-sistema" class="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-700">
+          <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span><span id="estado-texto">OPERATIVO</span>
+        </span>
+        <button id="btn-sonido" title="Alerta sonora" class="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-muted hover:bg-slate-50">🔔 Sonido: activo</button>
+        <div class="relative">
+          <button id="btn-usuario" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"></button>
+          <div id="menu-usuario" class="hidden absolute right-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-40 py-1">
+            <button id="btn-password" class="w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Cambiar contraseña</button>
+            <button id="btn-salir" class="w-full text-left px-3 py-2 text-sm text-red-700 hover:bg-red-50">Cerrar sesión</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <nav class="max-w-7xl mx-auto px-4 sm:px-6 flex gap-1 overflow-x-auto" id="tabs">
+      <button data-tab="vivo" class="tab">En vivo</button>
+      <button data-tab="historial" class="tab">Historial</button>
+      <button data-tab="camaras" class="tab">Cámaras</button>
+      <button data-tab="usuarios" class="tab solo-admin">Usuarios</button>
+      <button data-tab="auditoria" class="tab solo-admin">Auditoría</button>
+    </nav>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+
+    <!-- ============================== EN VIVO -->
+    <section id="tab-vivo" class="panel space-y-6">
+      <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="kpi"><p class="kpi-label">Lecturas 24 h</p><p id="kpi-lecturas" class="kpi-valor">—</p></div>
+        <div class="kpi"><p class="kpi-label">Alertas 24 h</p><p id="kpi-alertas" class="kpi-valor text-red-600">—</p></div>
+        <div class="kpi"><p class="kpi-label">Encargos vigentes</p><p id="kpi-hotlist" class="kpi-valor text-accent">—</p></div>
+        <div class="kpi"><p class="kpi-label">Cámaras en línea</p><p id="kpi-camaras" class="kpi-valor">—</p></div>
+        <div class="kpi col-span-2 lg:col-span-1"><p class="kpi-label">Confianza OCR prom.</p><p id="kpi-confianza" class="kpi-valor">—</p></div>
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 card">
+          <div class="card-head">
+            <h2 class="text-sm font-semibold">Eventos LPR en tiempo real</h2>
+            <span class="text-xs text-muted">Últimos 50 · actualización 2 s</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="thead">
+                <th class="th">Fecha / hora</th><th class="th">Patente</th><th class="th">Estado</th>
+                <th class="th">Cámara</th><th class="th text-right">Confianza</th>
+              </tr></thead>
+              <tbody id="tabla-eventos" class="divide-y divide-slate-100"></tbody>
+            </table>
+            <p id="sin-eventos" class="px-5 py-10 text-center text-sm text-muted">Esperando lecturas de las cámaras…</p>
+          </div>
+        </div>
+
+        <div class="space-y-6">
+          <div class="card">
+            <div class="card-head"><h2 class="text-sm font-semibold">Hotlist · Encargos vigentes</h2></div>
+            <ul id="lista-hotlist" class="divide-y divide-slate-100 max-h-80 overflow-y-auto"></ul>
+          </div>
+
+          <div class="card p-5">
+            <h2 class="text-sm font-semibold mb-3">Agregar a hotlist</h2>
+            <form id="form-hotlist" class="space-y-3">
+              <input id="f-patente" required placeholder="Patente (ej: ABCD-12 o AB-1234)" class="input font-mono uppercase">
+              <input id="f-motivo" required maxlength="120" placeholder="Motivo (ej: Encargo vigente por robo)" class="input">
+              <div class="grid grid-cols-2 gap-3">
+                <select id="f-nivel" class="input">
+                  <option value="CRITICA">CRÍTICA</option>
+                  <option value="PRECAUCION" selected>PRECAUCIÓN</option>
+                </select>
+                <input id="f-vence" type="date" title="Vencimiento (opcional)" class="input">
+              </div>
+              <p class="text-xs text-muted">Vencimiento opcional: el encargo se elimina solo en esa fecha.</p>
+              <button class="btn-primario w-full">Registrar encargo</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2 class="text-sm font-semibold">Estado de cámaras</h2></div>
+            <ul id="lista-camaras-vivo" class="divide-y divide-slate-100"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== HISTORIAL -->
+    <section id="tab-historial" class="panel hidden space-y-4">
+      <form id="form-historial" class="card p-5 grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
+        <label class="col-span-2 md:col-span-1"><span class="kpi-label">Patente</span><input id="h-patente" class="input font-mono uppercase" placeholder="ABCD-12"></label>
+        <label><span class="kpi-label">Desde</span><input id="h-desde" type="date" class="input"></label>
+        <label><span class="kpi-label">Hasta</span><input id="h-hasta" type="date" class="input"></label>
+        <label><span class="kpi-label">Cámara</span><select id="h-camara" class="input"><option value="">Todas</option></select></label>
+        <label class="flex items-center gap-2 text-sm pb-2"><input id="h-alertas" type="checkbox" class="rounded"> Solo alertas</label>
+        <div class="flex gap-2 col-span-2 md:col-span-1">
+          <button class="btn-primario flex-1">Buscar</button>
+          <button type="button" id="btn-csv" class="btn-secundario">CSV</button>
+        </div>
+      </form>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <p class="text-xs text-muted">Cada búsqueda y exportación queda registrada en la auditoría (acceso a datos personales).</p>
+        <button type="button" id="btn-suprimir" class="btn-mini solo-admin text-red-700">Suprimir registros de esta patente</button>
+      </div>
+      <div class="card overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="thead">
+            <th class="th">Fecha / hora</th><th class="th">Patente</th><th class="th">Estado</th>
+            <th class="th">Ubicación</th><th class="th">Cámara</th><th class="th text-right">Confianza</th>
+          </tr></thead>
+          <tbody id="tabla-historial" class="divide-y divide-slate-100"></tbody>
+        </table>
+        <p id="historial-vacio" class="px-5 py-10 text-center text-sm text-muted">Use los filtros y presione Buscar.</p>
+      </div>
+    </section>
+
+    <!-- ============================== CÁMARAS -->
+    <section id="tab-camaras" class="panel hidden space-y-6">
+      <div id="clave-nueva" class="hidden card p-5 border-amber-300 bg-amber-50">
+        <h3 class="text-sm font-semibold text-amber-900">API key de <span id="clave-cam"></span> — cópiela ahora, no se volverá a mostrar</h3>
+        <div class="mt-3 flex gap-2">
+          <code id="clave-valor" class="flex-1 bg-white border border-amber-200 rounded px-3 py-2 text-xs font-mono break-all"></code>
+          <button id="btn-copiar" class="btn-secundario">Copiar</button>
+        </div>
+        <p class="text-xs text-amber-900 mt-3">En el nodo edge, en el archivo <code>edge/.env</code>: <code>NEXUS_API_KEY=&lt;esta clave&gt;</code></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2 class="text-sm font-semibold">Cámaras registradas</h2></div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead><tr class="thead">
+              <th class="th">ID</th><th class="th">Nombre</th><th class="th">Ubicación</th><th class="th">Estado</th>
+              <th class="th">Último contacto</th><th class="th solo-admin text-right">Acciones</th>
+            </tr></thead>
+            <tbody id="tabla-camaras" class="divide-y divide-slate-100"></tbody>
+          </table>
+          <p id="camaras-vacio" class="hidden px-5 py-10 text-center text-sm text-muted">No hay cámaras registradas.</p>
+        </div>
+      </div>
+
+      <form id="form-camara" class="card p-5 solo-admin grid md:grid-cols-4 gap-3 items-end">
+        <label><span class="kpi-label">ID</span><input id="c-id" required placeholder="CAM-EDGE-01" class="input font-mono uppercase"></label>
+        <label><span class="kpi-label">Nombre</span><input id="c-nombre" required placeholder="Acceso norte" class="input"></label>
+        <label><span class="kpi-label">Ubicación</span><input id="c-ubicacion" required placeholder="Pasaje Piloto - Linares" class="input"></label>
+        <button class="btn-primario">Registrar cámara</button>
+      </form>
+    </section>
+
+    <!-- ============================== USUARIOS -->
+    <section id="tab-usuarios" class="panel hidden space-y-6">
+      <div class="card overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="thead"><th class="th">Usuario</th><th class="th">Rol</th><th class="th">Estado</th><th class="th">Creado</th><th class="th text-right">Acciones</th></tr></thead>
+          <tbody id="tabla-usuarios" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+      <form id="form-usuario" class="card p-5 grid md:grid-cols-4 gap-3 items-end">
+        <label><span class="kpi-label">Usuario</span><input id="u-usuario" required class="input" placeholder="guardia1"></label>
+        <label><span class="kpi-label">Contraseña (mín. 10)</span><input id="u-password" type="password" required minlength="10" class="input"></label>
+        <label><span class="kpi-label">Rol</span><select id="u-rol" class="input"><option value="operador">Operador</option><option value="admin">Administrador</option></select></label>
+        <button class="btn-primario">Crear usuario</button>
+      </form>
+    </section>
+
+    <!-- ============================== AUDITORÍA -->
+    <section id="tab-auditoria" class="panel hidden">
+      <div class="card overflow-x-auto">
+        <div class="card-head"><h2 class="text-sm font-semibold">Registro de auditoría</h2><span class="text-xs text-muted">Últimos 200 registros</span></div>
+        <table class="w-full text-sm">
+          <thead><tr class="thead"><th class="th">Fecha / hora</th><th class="th">Usuario</th><th class="th">Acción</th><th class="th">Detalle</th><th class="th">IP</th></tr></thead>
+          <tbody id="tabla-auditoria" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <p id="pie" class="text-center text-xs text-muted mt-10"></p>
+  </main>
+
+  <!-- Modal genérico -->
+  <div id="modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-auto">
+      <div class="card-head"><h3 id="modal-titulo" class="text-sm font-semibold"></h3><button id="modal-cerrar" class="text-muted hover:text-primary text-lg leading-none">×</button></div>
+      <div id="modal-cuerpo" class="p-5"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden fixed bottom-4 right-4 z-50 rounded-lg px-4 py-3 text-sm shadow-lg"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+# NEXUS-LPR — Despliegue en el equipo local del pasaje
+#
+#   docker compose up -d                    # servidor + cámaras
+#   docker compose --profile remoto up -d   # + acceso remoto por Cloudflare Tunnel
+#
+# Agregar una cámara: copie el bloque "camara-01", cambie el nombre y su archivo
+# edge/camaras/<nombre>.env (ver edge/camara.env.example).
+
+services:
+  nexus-server:
+    build: .
+    container_name: nexus-server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /app/data
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "3000:3000"          # panel en la red local: http://<IP-del-equipo>:3000
+    logging: &logs
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  camara-01:
+    build: ./edge
+    container_name: nexus-camara-01
+    restart: unless-stopped
+    env_file: ./edge/camaras/camara-01.env
+    environment:
+      NEXUS_API: http://nexus-server:3000
+    volumes:
+      - camara01-estado:/app/estado
+    depends_on: [nexus-server]
+    logging: *logs
+
+  # camara-02:
+  #   build: ./edge
+  #   container_name: nexus-camara-02
+  #   restart: unless-stopped
+  #   env_file: ./edge/camaras/camara-02.env
+  #   environment:
+  #     NEXUS_API: http://nexus-server:3000
+  #   volumes:
+  #     - camara02-estado:/app/estado
+  #   depends_on: [nexus-server]
+  #   logging: *logs
+
+  # Acceso remoto seguro (HTTPS) sin abrir puertos del router
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: nexus-tunel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on: [nexus-server]
+    profiles: [remoto]
+    logging: *logs
+
+volumes:
+  camara01-estado:
+  # camara02-estado:

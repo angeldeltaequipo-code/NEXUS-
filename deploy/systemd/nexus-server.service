@@ -1,0 +1,22 @@
+# NEXUS-LPR — Servidor (instalación sin Docker)
+# Copiar a /etc/systemd/system/ y: sudo systemctl enable --now nexus-server
+[Unit]
+Description=NEXUS-LPR servidor (API + Centro de Comando)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nexus
+WorkingDirectory=/opt/nexus-lpr
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/nexus-lpr/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
