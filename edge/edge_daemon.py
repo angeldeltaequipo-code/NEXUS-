@@ -83,6 +83,9 @@ A_LETRA = {"0": "D", "1": "L", "2": "Z", "4": "A", "5": "S", "6": "G", "7": "T",
 A_DIGITO = {"O": "0", "D": "0", "Q": "0", "U": "0", "I": "1", "L": "1", "T": "7",
             "Z": "2", "S": "5", "G": "6", "B": "8", "A": "4"}
 PALABRAS_IGNORADAS = {"CHILE", "CL"}
+# Formato nuevo (2007+, autos y motos): solo consonantes, sin M, N, Ñ ni Q
+CONSONANTES = set("BCDFGHJKLPRSTVWXYZ")
+NUEVOS = {"auto_nuevo", "moto_nuevo"}
 
 
 def limpiar(texto: str) -> str:
@@ -95,11 +98,11 @@ def analizar(texto: str) -> str | None:
     t = limpiar(texto)
     if not t or t in PALABRAS_IGNORADAS:
         return None
-    for _, rx in FORMATOS:
+    for nombre, rx in FORMATOS:
         m = rx.match(t)
-        if m:
+        if m and (nombre not in NUEVOS or set(m.group(1)) <= CONSONANTES):
             return f"{m.group(1)}-{m.group(2)}"
-    for nl, nd in ((4, 2), (2, 4), (3, 2), (2, 3)):
+    for nombre, nl, nd in (("auto_nuevo", 4, 2), ("auto_antiguo", 2, 4), ("moto_nuevo", 3, 2), ("moto_antiguo", 2, 3)):
         if len(t) != nl + nd:
             continue
         out = ""
@@ -108,8 +111,11 @@ def analizar(texto: str) -> str | None:
                 out += c if c.isalpha() else A_LETRA.get(c, "?")
             else:
                 out += c if c.isdigit() else A_DIGITO.get(c, "?")
-        if "?" not in out:
-            return f"{out[:nl]}-{out[nl:]}"
+        cambios = sum(a != b for a, b in zip(out, t))
+        # Más de 1 corrección ya es adivinar: se descarta
+        if "?" in out or cambios > 1 or (nombre in NUEVOS and not set(out[:nl]) <= CONSONANTES):
+            continue
+        return f"{out[:nl]}-{out[nl:]}"
     return None
 
 
@@ -177,25 +183,76 @@ def candidatos(resultados: list, min_conf: float) -> list:
 # Confirmación entre cuadros y anti-duplicados
 # =====================================================================
 class Confirmador:
-    def __init__(self, n_confirmar: int, conf_directa: float, dedup_s: float, ventana_s: float = 4.0):
-        self.n, self.directa, self.dedup, self.ventana = n_confirmar, conf_directa, dedup_s, ventana_s
-        self.vistas: dict[str, deque] = defaultdict(deque)
-        self.enviadas: dict[str, float] = {}
+    """
+    Agrupa las lecturas de un mismo vehículo en una "sesión" (patentes iguales o
+    con 1 carácter distinto) y decide la patente por votación por carácter,
+    ponderada por confianza. Así una mala lectura a distancia (D↔P, 0↔O) no
+    genera un evento falso ni se impone sobre la lectura correcta.
+    """
 
-    def registrar(self, patente: str, conf: float, ahora: float | None = None) -> bool:
-        """True si la patente queda confirmada y debe enviarse."""
-        ahora = ahora or time.time()
-        if ahora - self.enviadas.get(patente, 0) < self.dedup:
+    def __init__(self, n_confirmar: int, conf_directa: float, dedup_s: float, ventana_s: float = 4.0,
+                 votos_min: int = 4, espera_s: float = 1.0):
+        self.n, self.directa, self.dedup, self.ventana = n_confirmar, conf_directa, dedup_s, ventana_s
+        self.votos_min, self.espera = max(votos_min, n_confirmar), espera_s
+        self.sesiones: list[dict] = []
+
+    @staticmethod
+    def _similares(a: str, b: str) -> bool:
+        """Distancia de edición ≤ 1 (un carácter cambiado, de más o de menos)."""
+        a, b = a.replace("-", ""), b.replace("-", "")
+        if abs(len(a) - len(b)) > 1:
             return False
-        q = self.vistas[patente]
-        q.append((ahora, conf))
-        while q and ahora - q[0][0] > self.ventana:
-            q.popleft()
-        if len(q) >= self.n or conf >= self.directa:
-            self.enviadas[patente] = ahora
-            q.clear()
-            return True
-        return False
+        if len(a) == len(b):
+            return sum(x != y for x, y in zip(a, b)) <= 1
+        if len(a) > len(b):
+            a, b = b, a
+        return any(b[:i] + b[i + 1:] == a for i in range(len(b)))
+
+    @staticmethod
+    def _votar(lecturas) -> str:
+        largos = defaultdict(float)
+        for _, p, c in lecturas:
+            largos[len(p)] += c
+        largo = max(largos, key=largos.get)
+        votos = [defaultdict(float) for _ in range(largo)]
+        for _, p, c in lecturas:
+            if len(p) == largo:
+                for i, ch in enumerate(p):
+                    votos[i][ch] += c
+        return "".join(max(v, key=v.get) for v in votos)
+
+    def registrar(self, patente: str, conf: float, ahora: float | None = None) -> str | None:
+        """Devuelve la patente a enviar cuando el vehículo queda confirmado; si no, None."""
+        ahora = ahora or time.time()
+        # Expirar sesiones: enviadas tras DEDUP sin verse; pendientes tras la ventana
+        self.sesiones = [s for s in self.sesiones
+                         if ahora - s["ultima"] <= (self.dedup if s["enviada"] else self.ventana)]
+        ses = next((s for s in self.sesiones
+                    if any(self._similares(patente, p) for _, p, _ in s["lecturas"])
+                    or (s["enviada"] and self._similares(patente, s["enviada"]))), None)
+        if ses is None:
+            ses = {"lecturas": deque(maxlen=30), "enviada": None, "ultima": ahora}
+            self.sesiones.append(ses)
+        ses["lecturas"].append((ahora, patente, conf))
+        ses["ultima"] = ahora
+        if ses["enviada"]:
+            return None  # mismo vehículo ya informado
+        recientes = [l for l in ses["lecturas"] if ahora - l[0] <= self.ventana]
+        # Se decide con suficientes votos, o antes si la lectura es muy segura
+        if len(recientes) >= self.votos_min or (len(recientes) >= self.n and conf >= self.directa):
+            ses["enviada"] = self._votar(recientes)
+            return ses["enviada"]
+        return None
+
+    def vencidas(self, ahora: float | None = None) -> list[str]:
+        """Vehículos con lecturas suficientes que dejaron de verse: se deciden con lo que hay."""
+        ahora = ahora or time.time()
+        listas = []
+        for s in self.sesiones:
+            if not s["enviada"] and len(s["lecturas"]) >= self.n and ahora - s["ultima"] >= self.espera:
+                s["enviada"] = self._votar(s["lecturas"])
+                listas.append(s["enviada"])
+        return listas
 
 
 # =====================================================================
@@ -285,11 +342,20 @@ class Captura(threading.Thread):
             espera, fallos = 2, 0
             # Video grabado (no RTSP/HTTP): reproducir a velocidad real para simular una cámara
             es_archivo = not self.url.lower().startswith(("rtsp://", "rtsps://", "http://", "https://"))
-            pausa = 1.0 / (cap.get(cv2.CAP_PROP_FPS) or 15) if es_archivo else 0
+            fps_video = cap.get(cv2.CAP_PROP_FPS) or 15
+            t_inicio, n_cuadro = time.time(), 0
             while not self.parar.is_set():
-                if pausa:
-                    time.sleep(pausa)
+                if es_archivo:
+                    # Sincronizar con el reloj: como una cámara real, los cuadros
+                    # atrasados se descartan en vez de reproducir el video más lento.
+                    objetivo = int((time.time() - t_inicio) * fps_video)
+                    while n_cuadro < objetivo - 1 and cap.grab():
+                        n_cuadro += 1
+                    adelanto = (n_cuadro - (time.time() - t_inicio) * fps_video) / fps_video
+                    if adelanto > 0:
+                        time.sleep(adelanto)
                 ok, frame = cap.read()
+                n_cuadro += 1
                 if not ok:
                     fallos += 1
                     if es_archivo:
@@ -335,22 +401,33 @@ def ahora_iso() -> str:
 # =====================================================================
 # Modos de operación
 # =====================================================================
-def procesar_cuadro(frame, ocr, cfg, confirmador, cliente, origen="CAM"):
+def enviar(patente, conf, frame, cfg, cliente, origen="CAM"):
+    r = cliente.enviar_lectura({"patente": patente, "confianza": round(conf * 100, 1), "capturado": ahora_iso()})
+    if r is None:
+        return
+    if r.get("alerta"):
+        log.warning("🚨 ALERTA %s → %s", r.get("patente"), r.get("estado"))
+        if cfg["evidencia"] and frame is not None:
+            jpeg = jpeg_evidencia(frame)
+            if jpeg:
+                threading.Thread(target=cliente.subir_foto, args=(r["id"], jpeg), daemon=True).start()
+    else:
+        log.info("%s %s (%.1f%%) → %s", origen, r.get("patente"), conf * 100, r.get("estado"))
+
+
+def procesar_cuadro(frame, ocr, cfg, confirmador, cliente, estado: dict):
     zona, _ = recortar_roi(frame, cfg["roi"])
-    for patente, conf, _caja in candidatos(ocr.leer(zona), cfg["min_conf"]):
-        if not confirmador.registrar(patente, conf):
-            continue
-        r = cliente.enviar_lectura({"patente": patente, "confianza": round(conf * 100, 1), "capturado": ahora_iso()})
-        if r is None:
-            continue
-        if r.get("alerta"):
-            log.warning("🚨 ALERTA %s → %s", r.get("patente"), r.get("estado"))
-            if cfg["evidencia"]:
-                jpeg = jpeg_evidencia(frame)
-                if jpeg:
-                    threading.Thread(target=cliente.subir_foto, args=(r["id"], jpeg), daemon=True).start()
-        else:
-            log.info("%s %s (%.1f%%) → %s", origen, r.get("patente"), conf * 100, r.get("estado"))
+    for lectura, conf, _caja in candidatos(ocr.leer(zona), cfg["min_conf"]):
+        estado["mejor"][lectura] = max(conf, estado["mejor"].get(lectura, 0))
+        estado["foto"] = frame
+        patente = confirmador.registrar(lectura, conf)
+        if patente:
+            enviar(patente, estado["mejor"].get(patente, conf), frame, cfg, cliente)
+    # Vehículos que salieron de cuadro antes de juntar todos los votos
+    for patente in confirmador.vencidas():
+        enviar(patente, estado["mejor"].get(patente, cfg["min_conf"]), estado.get("foto"), cfg, cliente)
+    if len(estado["mejor"]) > 500:
+        estado["mejor"].clear()
 
 
 def hilos_fondo(cliente: Cliente, cfg: dict, parar: threading.Event):
@@ -376,13 +453,14 @@ def modo_rtsp(cfg: dict, parar: threading.Event):
     cap = Captura(cfg["rtsp"], parar); cap.start()
     log.info("Pipeline OCR (%s) activo · %.1f cuadros/s · ROI=%s", cfg["motor"], cfg["fps"], cfg["roi"])
     ultimo_ts, intervalo = 0.0, 1.0 / max(cfg["fps"], 0.1)
+    estado = {"mejor": {}, "foto": None}
     while not parar.is_set():
         t0 = time.time()
         frame, ts = cap.ultimo()
         if frame is not None and ts != ultimo_ts:
             ultimo_ts = ts
             try:
-                procesar_cuadro(frame, ocr, cfg, confirmador, cliente)
+                procesar_cuadro(frame, ocr, cfg, confirmador, cliente, estado)
             except Exception as e:  # noqa: BLE001 — nunca botar el daemon
                 log.exception("Error procesando cuadro: %s", e)
         parar.wait(max(0.0, intervalo - (time.time() - t0)))
